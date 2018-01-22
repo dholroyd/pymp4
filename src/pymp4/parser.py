@@ -680,6 +680,37 @@ SampleEncryptionBox = Struct(
 
 ContainerBoxLazy = LazyBound(lambda ctx: ContainerBox)
 
+TfxdBox = Struct(
+    "version" / Int8ub,
+    "flags" / Const(Int24ub, 0),
+    "fragment_absolute_time" / IfThenElse(this.version == 0, Int32ub, Int64ub),
+    "fragment_absolute_duration" / IfThenElse(this.version == 0, Int32ub, Int64ub)
+)
+
+TfrfBox = Struct(
+    "version" / Int8ub,
+    "flags" / Const(Int24ub, 0),
+    "fragment_entries" / IfThenElse(
+        this.version==0,
+        PrefixedArray(Int8ub, Struct(
+            "fragment_absolute_time" / Int32ub,
+            "fragment_absolute_duration" / Int32ub
+        )),
+        PrefixedArray(Int8ub, Struct(
+            "fragment_absolute_time" / Int64ub,
+            "fragment_absolute_duration" / Int64ub
+        )),
+    )
+)
+
+UuidBox = Struct(
+    "type" / Const(b"uuid"),
+    "uuid" / UUIDBytes(Bytes(16)),
+    Embedded(Switch(this.uuid, {
+        UUID("6d1d9b05-42d5-44e6-80e2-141daff757b2"): TfxdBox,
+        UUID("d4807ef2-ca39-4695-8e54-26cb9e46a79f"): TfrfBox 
+    }, default=RawBox))
+)
 
 class TellMinusSizeOf(Subconstruct):
     def __init__(self, subcon):
@@ -738,6 +769,7 @@ Box = PrefixedIncludingSize(Int32ub, Struct(
         b"sidx": SegmentIndexBox,
         b"saiz": SampleAuxiliaryInformationSizesBox,
         b"saio": SampleAuxiliaryInformationOffsetsBox,
+        b"uuid": UuidBox,
         # dash
         b"tenc": TrackEncryptionBox,
         b"pssh": ProtectionSystemHeaderBox,
